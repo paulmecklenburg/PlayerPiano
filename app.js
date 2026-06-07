@@ -246,6 +246,14 @@ class PlayerPiano {
             const beatsPerSec = CONFIG.bpm / 60;
             this.currentTime += dt * beatsPerSec;
             this.scrollOffset = this.currentTime; // Auto-scroll
+
+            // Auto-stop after last note
+            if (this.song.notes.length > 0) {
+                const lastNoteEnd = Math.max(...this.song.notes.map(n => n.start + n.duration));
+                if (this.currentTime > lastNoteEnd + 1) { // 1 beat buffer
+                    this.stop();
+                }
+            }
         }
 
         this.updateAudio();

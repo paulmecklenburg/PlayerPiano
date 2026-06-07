@@ -17,44 +17,73 @@ body, html {
 
 header {
     background-color: #2a2a2a;
-    padding: 10px;
+    padding: 8px;
     display: flex;
-    justify-content: space-between;
+    flex-wrap: wrap;
+    justify-content: flex-start;
     align-items: center;
+    gap: 12px;
     border-bottom: 1px solid #444;
 }
 
-.controls-main, .controls-song {
+.controls-group {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: center;
 }
 
+.toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+}
+
+.input-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 10px;
+    color: #888;
+}
+
 button {
-    padding: 12px 20px;
+    padding: 8px 12px;
     cursor: pointer;
     background-color: #444;
     color: white;
     border: none;
     border-radius: 4px;
-    font-size: 16px;
-}
-
-button:hover {
-    background-color: #555;
-}
-
-button:active {
-    background-color: #333;
+    font-size: 14px;
+    white-space: nowrap;
 }
 
 input, select {
     background-color: #333;
     color: white;
     border: 1px solid #444;
-    padding: 10px;
+    padding: 6px;
     border-radius: 4px;
-    font-size: 16px;
+    font-size: 14px;
+}
+
+.instructions {
+    font-size: 11px;
+    color: #888;
+    margin-left: auto;
+}
+
+@media (max-width: 800px) {
+    header {
+        gap: 6px;
+    }
+    button, input, select {
+        padding: 6px 8px;
+        font-size: 12px;
+    }
+    .instructions {
+        display: none;
+    }
 }
 
 main {

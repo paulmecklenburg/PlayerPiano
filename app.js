@@ -21,14 +21,16 @@ class PlayerPiano {
         this.song = {
             name: "My Song",
             timeSignature: "4/4",
+            bpm: 120,
             notes: [] // { midi, start, duration }
         };
+        this.lastSavedState = JSON.stringify(this.song);
 
         this.undoStack = [];
         this.redoStack = [];
 
         this.synth = new Tone.PolySynth(Tone.Synth).toDestination();
-        this.activeMidis = new Set();
+        this.activeNotes = new Set(); // Set of note objects currently playing
 
         this.scrollOffset = 0; // Vertical scroll in beats
         this.lastTime = 0;
@@ -85,6 +87,10 @@ class PlayerPiano {
             this.stop();
         });
 
+        document.getElementById('new-song').addEventListener('click', () => {
+            this.newSong();
+        });
+
         document.getElementById('undo').addEventListener('click', () => this.undo());
         document.getElementById('redo').addEventListener('click', () => this.redo());
 
@@ -101,15 +107,41 @@ class PlayerPiano {
             this.song.timeSignature = e.target.value;
         });
 
+        document.getElementById('bpm-input').addEventListener('change', (e) => {
+            this.song.bpm = parseInt(e.target.value) || 120;
+        });
+
         document.getElementById('instrument-type').addEventListener('change', (e) => {
             this.setInstrument(e.target.value);
         });
     }
 
+    newSong() {
+        const currentState = JSON.stringify(this.song);
+        if (this.song.notes.length > 0 && currentState !== this.lastSavedState) {
+            if (!confirm("You have unsaved changes. Create a new song anyway?")) {
+                return;
+            }
+        }
+        this.stop();
+        this.song = {
+            name: "New Song",
+            timeSignature: "4/4",
+            bpm: 120,
+            notes: []
+        };
+        this.undoStack = [];
+        this.redoStack = [];
+        document.getElementById('song-name').value = this.song.name;
+        document.getElementById('time-signature').value = this.song.timeSignature;
+        document.getElementById('bpm-input').value = this.song.bpm;
+        this.lastSavedState = JSON.stringify(this.song);
+    }
+
     setInstrument(type) {
         // Release any currently hanging notes
-        this.activeMidis.forEach(midi => this.synth.triggerRelease(this.getMidiName(midi)));
-        this.activeMidis.clear();
+        this.activeNotes.forEach(midi => this.synth.triggerRelease(this.getMidiName(midi), Tone.now()));
+        this.activeNotes.clear();
         this.synth.dispose();
 
         switch(type) {
@@ -141,10 +173,11 @@ class PlayerPiano {
     }
 
     pushState() {
-        // Deep copy of current notes and time signature
+        // Deep copy of current state
         const state = JSON.stringify({
             notes: this.song.notes,
-            timeSignature: this.song.timeSignature
+            timeSignature: this.song.timeSignature,
+            bpm: this.song.bpm
         });
         
         // Only push if different from last state
@@ -160,14 +193,18 @@ class PlayerPiano {
         
         const currentState = JSON.stringify({
             notes: this.song.notes,
-            timeSignature: this.song.timeSignature
+            timeSignature: this.song.timeSignature,
+            bpm: this.song.bpm
         });
         this.redoStack.push(currentState);
 
         const prevState = JSON.parse(this.undoStack.pop());
         this.song.notes = prevState.notes;
         this.song.timeSignature = prevState.timeSignature;
+        this.song.bpm = prevState.bpm || 120;
+        
         document.getElementById('time-signature').value = this.song.timeSignature;
+        document.getElementById('bpm-input').value = this.song.bpm;
     }
 
     redo() {
@@ -175,14 +212,18 @@ class PlayerPiano {
 
         const currentState = JSON.stringify({
             notes: this.song.notes,
-            timeSignature: this.song.timeSignature
+            timeSignature: this.song.timeSignature,
+            bpm: this.song.bpm
         });
         this.undoStack.push(currentState);
 
         const nextState = JSON.parse(this.redoStack.pop());
         this.song.notes = nextState.notes;
         this.song.timeSignature = nextState.timeSignature;
+        this.song.bpm = nextState.bpm || 120;
+
         document.getElementById('time-signature').value = this.song.timeSignature;
+        document.getElementById('bpm-input').value = this.song.bpm;
     }
 
     initEventListeners() {
@@ -226,8 +267,8 @@ class PlayerPiano {
         } else {
             this.isPlaying = false;
             document.getElementById('play-pause').textContent = 'Play';
-            this.activeMidis.forEach(midi => this.synth.triggerRelease(this.getMidiName(midi)));
-            this.activeMidis.clear();
+            this.activeNotes.forEach(midi => this.synth.triggerRelease(this.getMidiName(midi), Tone.now()));
+            this.activeNotes.clear();
             this.updateKeyVisuals();
         }
     }
@@ -237,8 +278,8 @@ class PlayerPiano {
         this.currentTime = 0;
         this.scrollOffset = 0;
         document.getElementById('play-pause').textContent = 'Play';
-        this.activeMidis.forEach(midi => this.synth.triggerRelease(this.getMidiName(midi)));
-        this.activeMidis.clear();
+        this.activeNotes.forEach(midi => this.synth.triggerRelease(this.getMidiName(midi), Tone.now()));
+        this.activeNotes.clear();
         this.updateKeyVisuals();
     }
 
@@ -365,7 +406,8 @@ class PlayerPiano {
         this.lastTime = t;
 
         if (this.isPlaying) {
-            const beatsPerSec = CONFIG.bpm / 60;
+            const currentBpm = this.song.bpm || 120;
+            const beatsPerSec = currentBpm / 60;
             this.currentTime += dt * beatsPerSec;
             this.scrollOffset = this.currentTime; // Auto-scroll
 
@@ -396,27 +438,36 @@ class PlayerPiano {
         });
 
         // Trigger new notes
+        const notesToAttack = [];
         currentMidis.forEach(midi => {
-            if (!this.activeMidis.has(midi)) {
-                this.synth.triggerAttack(this.getMidiName(midi), Tone.now());
+            if (!this.activeNotes.has(midi)) {
+                notesToAttack.push(this.getMidiName(midi));
             }
         });
+        if (notesToAttack.length > 0) {
+            this.synth.triggerAttack(notesToAttack, Tone.now());
+        }
 
         // Release old notes
-        this.activeMidis.forEach(midi => {
+        const notesToRelease = [];
+        this.activeNotes.forEach(midi => {
             if (!currentMidis.has(midi)) {
-                this.synth.triggerRelease(this.getMidiName(midi), Tone.now());
+                notesToRelease.push(this.getMidiName(midi));
             }
         });
+        if (notesToRelease.length > 0) {
+            this.synth.triggerRelease(notesToRelease, Tone.now());
+        }
 
-        this.activeMidis = currentMidis;
+        this.activeNotes = currentMidis;
     }
 
     updateKeyVisuals() {
         const keys = this.keysContainer.querySelectorAll('.key');
+        
         keys.forEach(key => {
             const midi = parseInt(key.dataset.midi);
-            if (this.activeMidis.has(midi)) {
+            if (this.activeNotes.has(midi)) {
                 key.classList.add('active');
             } else {
                 key.classList.remove('active');
@@ -516,9 +567,13 @@ class PlayerPiano {
     saveSong() {
         const name = document.getElementById('song-name').value || "Untitled";
         this.song.name = name;
+        this.song.bpm = parseInt(document.getElementById('bpm-input').value) || 120;
+        
         const songs = JSON.parse(localStorage.getItem('piano-songs') || '{}');
         songs[name] = this.song;
         localStorage.setItem('piano-songs', JSON.stringify(songs));
+        
+        this.lastSavedState = JSON.stringify(this.song);
         this.loadSongList();
         alert('Song saved!');
     }
@@ -526,7 +581,7 @@ class PlayerPiano {
     loadSongList() {
         const select = document.getElementById('load-song');
         const songs = JSON.parse(localStorage.getItem('piano-songs') || '{}');
-        select.innerHTML = '<option value="">Load Song...</option>';
+        select.innerHTML = '<option value="">Load...</option>';
         Object.keys(songs).forEach(name => {
             const opt = document.createElement('option');
             opt.value = name;
@@ -541,6 +596,8 @@ class PlayerPiano {
             this.song = songs[name];
             document.getElementById('song-name').value = this.song.name;
             document.getElementById('time-signature').value = this.song.timeSignature;
+            document.getElementById('bpm-input').value = this.song.bpm || 120;
+            this.lastSavedState = JSON.stringify(this.song);
             this.stop();
         }
     }

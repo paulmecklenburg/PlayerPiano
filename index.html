@@ -10,22 +10,29 @@
 <body>
     <div id="app">
         <header>
-            <div class="controls-main">
+            <div class="controls-group">
+                <button id="new-song">New</button>
                 <button id="play-pause">Play</button>
                 <button id="stop">Stop</button>
                 <button id="undo" title="Ctrl+Z">Undo</button>
                 <button id="redo" title="Ctrl+Y">Redo</button>
+            </div>
+            <div class="controls-group">
                 <div class="toggle-container">
-                    <label>Edit Mode</label>
+                    <label>Edit</label>
                     <input type="checkbox" id="mode-toggle" checked>
                 </div>
                 <div class="toggle-container">
-                    <label>Delete Mode</label>
+                    <label>Delete</label>
                     <input type="checkbox" id="delete-toggle">
                 </div>
             </div>
-            <div class="controls-song">
-                <input type="text" id="song-name" placeholder="Song Name" value="My Song">
+            <div class="controls-group">
+                <input type="text" id="song-name" placeholder="Song Name" value="My Song" style="width: 100px;">
+                <div class="input-unit">
+                    <label>BPM</label>
+                    <input type="number" id="bpm-input" value="120" min="20" max="300" style="width: 50px;">
+                </div>
                 <select id="time-signature">
                     <option value="4/4">4/4</option>
                     <option value="3/4">3/4</option>
@@ -41,14 +48,15 @@
                     <option value="fmsynth">Electric Piano (FM)</option>
                     <option value="amsynth">Warm Organ (AM)</option>
                 </select>
+            </div>
+            <div class="controls-group">
                 <button id="save-song">Save</button>
                 <select id="load-song">
-                    <option value="">Load Song...</option>
+                    <option value="">Load...</option>
                 </select>
             </div>
-            <div class="instructions" style="font-size: 0.8em; color: #888; text-align: right;">
-                Left-click: Add/Move/Resize (top edge)<br>
-                Right-click: Delete | Scroll: Mouse Wheel
+            <div class="instructions">
+                L: Add/Move | R/Delete: Del | Scroll: Wheel/Drag
             </div>
         </header>
 

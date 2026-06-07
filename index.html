@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Piano Editor</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div class="controls-main">
+                <button id="play-pause">Play</button>
+                <button id="stop">Stop</button>
+                <div class="toggle-container">
+                    <label>Edit Mode</label>
+                    <input type="checkbox" id="mode-toggle">
+                </div>
+            </div>
+            <div class="controls-song">
+                <input type="text" id="song-name" placeholder="Song Name" value="My Song">
+                <select id="time-signature">
+                    <option value="4/4">4/4</option>
+                    <option value="3/4">3/4</option>
+                    <option value="2/4">2/4</option>
+                    <option value="6/8">6/8</option>
+                </select>
+                <button id="save-song">Save</button>
+                <select id="load-song">
+                    <option value="">Load Song...</option>
+                </select>
+            </div>
+            <div class="instructions" style="font-size: 0.8em; color: #888; text-align: right;">
+                Left-click: Add/Move/Resize (top edge)<br>
+                Right-click: Delete | Scroll: Mouse Wheel
+            </div>
+        </header>
+
+        <main>
+            <div id="editor-container">
+                <canvas id="piano-roll"></canvas>
+            </div>
+            <div id="piano-keys-container">
+                <!-- 88 keys will be generated here -->
+            </div>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

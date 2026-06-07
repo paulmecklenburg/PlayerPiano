@@ -88,6 +88,44 @@ class PlayerPiano {
         document.getElementById('time-signature').addEventListener('change', (e) => {
             this.song.timeSignature = e.target.value;
         });
+
+        document.getElementById('instrument-type').addEventListener('change', (e) => {
+            this.setInstrument(e.target.value);
+        });
+    }
+
+    setInstrument(type) {
+        // Release any currently hanging notes
+        this.activeMidis.forEach(midi => this.synth.triggerRelease(this.getMidiName(midi)));
+        this.activeMidis.clear();
+        this.synth.dispose();
+
+        switch(type) {
+            case 'raw-triangle':
+                this.synth = new Tone.PolySynth(Tone.Synth, { 
+                    oscillator: { type: 'triangle' },
+                    envelope: { attack: 0.001, decay: 0, sustain: 1, release: 0.001 }
+                }).toDestination();
+                break;
+            case 'triangle':
+                this.synth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' } }).toDestination();
+                break;
+            case 'square':
+                this.synth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'square' } }).toDestination();
+                break;
+            case 'sawtooth':
+                this.synth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'sawtooth' } }).toDestination();
+                break;
+            case 'fmsynth':
+                this.synth = new Tone.PolySynth(Tone.FMSynth).toDestination();
+                break;
+            case 'amsynth':
+                this.synth = new Tone.PolySynth(Tone.AMSynth).toDestination();
+                break;
+            default:
+                this.synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                break;
+        }
     }
 
     initEventListeners() {

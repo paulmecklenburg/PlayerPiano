@@ -15,7 +15,7 @@ class PlayerPiano {
         this.keysContainer = document.getElementById('piano-keys-container');
         
         this.isPlaying = false;
-        this.isEditMode = true;
+        this.isEditMode = document.getElementById('mode-toggle').checked;
         this.currentTime = 0; // In beats
         this.song = {
             name: "My Song",
@@ -64,6 +64,9 @@ class PlayerPiano {
     initControls() {
         document.getElementById('mode-toggle').addEventListener('change', (e) => {
             this.isEditMode = e.target.checked;
+            if (!this.isEditMode) {
+                this.canvas.style.cursor = 'default';
+            }
         });
 
         document.getElementById('play-pause').addEventListener('click', () => {
@@ -154,10 +157,19 @@ class PlayerPiano {
 
         if (e.button === 0) { // Left click
             if (clickedNote) {
+                const progress = (pos.beatTime - clickedNote.start) / clickedNote.duration;
+                let type = 'move';
+                if (progress < 0.25) type = 'resize-bottom';
+                else if (progress > 0.75) type = 'resize-top';
+
                 this.dragState = {
                     note: clickedNote,
-                    type: (pos.beatTime > clickedNote.start + clickedNote.duration - 0.2) ? 'resize' : 'move',
-                    startPos: pos
+                    type: type,
+                    startPos: pos,
+                    originalStart: clickedNote.start,
+                    originalDuration: clickedNote.duration,
+                    originalEnd: clickedNote.start + clickedNote.duration,
+                    originalMidi: clickedNote.midi
                 };
             } else {
                 const newNote = {
@@ -168,8 +180,12 @@ class PlayerPiano {
                 this.song.notes.push(newNote);
                 this.dragState = {
                     note: newNote,
-                    type: 'resize',
-                    startPos: pos
+                    type: 'resize-top',
+                    startPos: pos,
+                    originalStart: newNote.start,
+                    originalDuration: newNote.duration,
+                    originalEnd: newNote.start + newNote.duration,
+                    originalMidi: newNote.midi
                 };
             }
         } else if (e.button === 2) { // Right click: Delete
@@ -180,17 +196,41 @@ class PlayerPiano {
     }
 
     handleMouseMove(e) {
-        if (!this.dragState || !this.isEditMode) return;
         const pos = this.getMousePos(e);
-
-        if (this.dragState.type === 'move') {
+        
+        if (this.dragState && this.isEditMode) {
             const diff = pos.beatTime - this.dragState.startPos.beatTime;
-            this.dragState.note.start = Math.max(0, Math.round((this.dragState.note.start + diff) * 4) / 4);
-            this.dragState.note.midi = pos.midi;
-            this.dragState.startPos = pos;
-        } else if (this.dragState.type === 'resize') {
-            const newDuration = pos.beatTime - this.dragState.note.start;
-            this.dragState.note.duration = Math.max(0.25, Math.round(newDuration * 4) / 4);
+            const note = this.dragState.note;
+
+            if (this.dragState.type === 'move') {
+                note.start = Math.max(0, Math.round((this.dragState.originalStart + diff) * 4) / 4);
+                note.midi = pos.midi;
+            } else if (this.dragState.type === 'resize-bottom') {
+                const newStart = Math.min(this.dragState.originalEnd - 0.25, Math.max(0, Math.round((this.dragState.originalStart + diff) * 4) / 4));
+                note.start = newStart;
+                note.duration = this.dragState.originalEnd - newStart;
+            } else if (this.dragState.type === 'resize-top') {
+                const newEnd = Math.max(note.start + 0.25, Math.round((this.dragState.originalEnd + diff) * 4) / 4);
+                note.duration = newEnd - note.start;
+            }
+        } else {
+            // Hover cursor signaling
+            if (!this.isEditMode) return;
+
+            const hoveredNote = this.song.notes.find(n => {
+                return n.midi === pos.midi && pos.beatTime >= n.start && pos.beatTime <= n.start + n.duration;
+            });
+
+            if (hoveredNote) {
+                const progress = (pos.beatTime - hoveredNote.start) / hoveredNote.duration;
+                if (progress < 0.25 || progress > 0.75) {
+                    this.canvas.style.cursor = 'ns-resize';
+                } else {
+                    this.canvas.style.cursor = 'move';
+                }
+            } else {
+                this.canvas.style.cursor = 'crosshair';
+            }
         }
     }
 

@@ -24,6 +24,9 @@ class PlayerPiano {
             notes: [] // { midi, start, duration }
         };
 
+        this.undoStack = [];
+        this.redoStack = [];
+
         this.synth = new Tone.PolySynth(Tone.Synth).toDestination();
         this.activeMidis = new Set();
 
@@ -82,6 +85,9 @@ class PlayerPiano {
             this.stop();
         });
 
+        document.getElementById('undo').addEventListener('click', () => this.undo());
+        document.getElementById('redo').addEventListener('click', () => this.redo());
+
         document.getElementById('save-song').addEventListener('click', () => {
             this.saveSong();
         });
@@ -91,6 +97,7 @@ class PlayerPiano {
         });
 
         document.getElementById('time-signature').addEventListener('change', (e) => {
+            this.pushState();
             this.song.timeSignature = e.target.value;
         });
 
@@ -133,11 +140,68 @@ class PlayerPiano {
         }
     }
 
+    pushState() {
+        // Deep copy of current notes and time signature
+        const state = JSON.stringify({
+            notes: this.song.notes,
+            timeSignature: this.song.timeSignature
+        });
+        
+        // Only push if different from last state
+        if (this.undoStack.length === 0 || this.undoStack[this.undoStack.length - 1] !== state) {
+            this.undoStack.push(state);
+            this.redoStack = []; // Clear redo on new action
+            if (this.undoStack.length > 50) this.undoStack.shift(); // Limit history
+        }
+    }
+
+    undo() {
+        if (this.undoStack.length === 0) return;
+        
+        const currentState = JSON.stringify({
+            notes: this.song.notes,
+            timeSignature: this.song.timeSignature
+        });
+        this.redoStack.push(currentState);
+
+        const prevState = JSON.parse(this.undoStack.pop());
+        this.song.notes = prevState.notes;
+        this.song.timeSignature = prevState.timeSignature;
+        document.getElementById('time-signature').value = this.song.timeSignature;
+    }
+
+    redo() {
+        if (this.redoStack.length === 0) return;
+
+        const currentState = JSON.stringify({
+            notes: this.song.notes,
+            timeSignature: this.song.timeSignature
+        });
+        this.undoStack.push(currentState);
+
+        const nextState = JSON.parse(this.redoStack.pop());
+        this.song.notes = nextState.notes;
+        this.song.timeSignature = nextState.timeSignature;
+        document.getElementById('time-signature').value = this.song.timeSignature;
+    }
+
     initEventListeners() {
         this.canvas.addEventListener('pointerdown', (e) => this.handlePointerDown(e));
         window.addEventListener('pointermove', (e) => this.handlePointerMove(e));
         window.addEventListener('pointerup', (e) => this.handlePointerUp(e));
         this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        window.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'z') {
+                    e.preventDefault();
+                    this.undo();
+                } else if (e.key === 'y' || (e.shiftKey && e.key === 'Z')) {
+                    e.preventDefault();
+                    this.redo();
+                }
+            }
+        });
         
         // Handle scrolling via mouse wheel
         this.canvas.addEventListener('wheel', (e) => {
@@ -201,6 +265,7 @@ class PlayerPiano {
         // Delete mode or right click
         if (this.isDeleteMode || e.button === 2) {
             if (clickedNote) {
+                this.pushState();
                 this.song.notes = this.song.notes.filter(n => n !== clickedNote);
             }
             return;
@@ -208,6 +273,7 @@ class PlayerPiano {
 
         if (e.button === 0 || e.pointerType === 'touch') {
             if (clickedNote) {
+                this.pushState();
                 const progress = (pos.beatTime - clickedNote.start) / clickedNote.duration;
                 let type = 'move';
                 if (progress < 0.25) type = 'resize-bottom';
@@ -288,6 +354,7 @@ class PlayerPiano {
 
     handlePointerUp() {
         if (this.dragState && this.dragState.potentialNewNote) {
+            this.pushState();
             this.song.notes.push(this.dragState.potentialNewNote);
         }
         this.dragState = null;

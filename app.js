@@ -16,6 +16,7 @@ class PlayerPiano {
         
         this.isPlaying = false;
         this.isEditMode = document.getElementById('mode-toggle').checked;
+        this.isDeleteMode = document.getElementById('delete-toggle').checked;
         this.currentTime = 0; // In beats
         this.song = {
             name: "My Song",
@@ -67,6 +68,10 @@ class PlayerPiano {
             if (!this.isEditMode) {
                 this.canvas.style.cursor = 'default';
             }
+        });
+
+        document.getElementById('delete-toggle').addEventListener('change', (e) => {
+            this.isDeleteMode = e.target.checked;
         });
 
         document.getElementById('play-pause').addEventListener('click', () => {
@@ -129,9 +134,9 @@ class PlayerPiano {
     }
 
     initEventListeners() {
-        this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
-        window.addEventListener('mousemove', (e) => this.handleMouseMove(e));
-        window.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+        this.canvas.addEventListener('pointerdown', (e) => this.handlePointerDown(e));
+        window.addEventListener('pointermove', (e) => this.handlePointerMove(e));
+        window.addEventListener('pointerup', (e) => this.handlePointerUp(e));
         this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
         
         // Handle scrolling via mouse wheel
@@ -184,7 +189,7 @@ class PlayerPiano {
         return { x, y, midi, beatTime };
     }
 
-    handleMouseDown(e) {
+    handlePointerDown(e) {
         if (!this.isEditMode) return;
         const pos = this.getMousePos(e);
 
@@ -193,7 +198,15 @@ class PlayerPiano {
             return n.midi === pos.midi && pos.beatTime >= n.start && pos.beatTime <= n.start + n.duration;
         });
 
-        if (e.button === 0) { // Left click
+        // Delete mode or right click
+        if (this.isDeleteMode || e.button === 2) {
+            if (clickedNote) {
+                this.song.notes = this.song.notes.filter(n => n !== clickedNote);
+            }
+            return;
+        }
+
+        if (e.button === 0 || e.pointerType === 'touch') {
             if (clickedNote) {
                 const progress = (pos.beatTime - clickedNote.start) / clickedNote.duration;
                 let type = 'move';
@@ -210,30 +223,22 @@ class PlayerPiano {
                     originalMidi: clickedNote.midi
                 };
             } else {
-                const newNote = {
-                    midi: pos.midi,
-                    start: Math.round(pos.beatTime * 4) / 4, // Snap to 16th
-                    duration: 0.5
-                };
-                this.song.notes.push(newNote);
+                // Background drag: setup potential scroll OR potential new note
                 this.dragState = {
-                    note: newNote,
-                    type: 'resize-top',
+                    type: 'scroll',
                     startPos: pos,
-                    originalStart: newNote.start,
-                    originalDuration: newNote.duration,
-                    originalEnd: newNote.start + newNote.duration,
-                    originalMidi: newNote.midi
+                    originalScroll: this.scrollOffset,
+                    potentialNewNote: {
+                        midi: pos.midi,
+                        start: Math.round(pos.beatTime * 4) / 4,
+                        duration: 0.5
+                    }
                 };
-            }
-        } else if (e.button === 2) { // Right click: Delete
-            if (clickedNote) {
-                this.song.notes = this.song.notes.filter(n => n !== clickedNote);
             }
         }
     }
 
-    handleMouseMove(e) {
+    handlePointerMove(e) {
         const pos = this.getMousePos(e);
         
         if (this.dragState && this.isEditMode) {
@@ -250,9 +255,18 @@ class PlayerPiano {
             } else if (this.dragState.type === 'resize-top') {
                 const newEnd = Math.max(note.start + 0.25, Math.round((this.dragState.originalEnd + diff) * 4) / 4);
                 note.duration = newEnd - note.start;
+            } else if (this.dragState.type === 'scroll') {
+                // Drag background to scroll
+                const pixelDiff = e.clientY - (this.dragState.startPos.y + this.canvas.getBoundingClientRect().top);
+                const beatDiff = pixelDiff / CONFIG.pixelsPerBeat;
+                
+                if (Math.abs(pixelDiff) > 10) {
+                    this.scrollOffset = Math.max(0, this.dragState.originalScroll + beatDiff);
+                    delete this.dragState.potentialNewNote;
+                }
             }
         } else {
-            // Hover cursor signaling
+            // Hover cursor signaling (for mouse users)
             if (!this.isEditMode) return;
 
             const hoveredNote = this.song.notes.find(n => {
@@ -272,7 +286,10 @@ class PlayerPiano {
         }
     }
 
-    handleMouseUp() {
+    handlePointerUp() {
+        if (this.dragState && this.dragState.potentialNewNote) {
+            this.song.notes.push(this.dragState.potentialNewNote);
+        }
         this.dragState = null;
     }
 

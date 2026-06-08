@@ -22,6 +22,7 @@ class PlayerPiano {
             name: "My Song",
             timeSignature: "4/4",
             bpm: 120,
+            instrument: "default",
             notes: [] // { midi, start, duration }
         };
         this.lastSavedState = JSON.stringify(this.song);
@@ -58,6 +59,8 @@ class PlayerPiano {
                     document.getElementById('song-name').value = this.song.name;
                     document.getElementById('time-signature').value = this.song.timeSignature;
                     document.getElementById('bpm-input').value = this.song.bpm || 120;
+                    document.getElementById('instrument-type').value = this.song.instrument || "default";
+                    this.setInstrument(this.song.instrument || "default");
                     this.lastSavedState = JSON.stringify(this.song);
                     window.location.hash = ''; // Clear hash after loading
                 }
@@ -265,6 +268,7 @@ class PlayerPiano {
             name: "New Song",
             timeSignature: "4/4",
             bpm: 120,
+            instrument: "default",
             notes: []
         };
         this.undoStack = [];
@@ -272,6 +276,8 @@ class PlayerPiano {
         document.getElementById('song-name').value = this.song.name;
         document.getElementById('time-signature').value = this.song.timeSignature;
         document.getElementById('bpm-input').value = this.song.bpm;
+        document.getElementById('instrument-type').value = this.song.instrument;
+        this.setInstrument(this.song.instrument);
         this.lastSavedState = JSON.stringify(this.song);
     }
 
@@ -314,7 +320,8 @@ class PlayerPiano {
         const state = JSON.stringify({
             notes: this.song.notes,
             timeSignature: this.song.timeSignature,
-            bpm: this.song.bpm
+            bpm: this.song.bpm,
+            instrument: this.song.instrument
         });
         
         // Only push if different from last state
@@ -331,7 +338,8 @@ class PlayerPiano {
         const currentState = JSON.stringify({
             notes: this.song.notes,
             timeSignature: this.song.timeSignature,
-            bpm: this.song.bpm
+            bpm: this.song.bpm,
+            instrument: this.song.instrument
         });
         this.redoStack.push(currentState);
 
@@ -339,9 +347,12 @@ class PlayerPiano {
         this.song.notes = prevState.notes;
         this.song.timeSignature = prevState.timeSignature;
         this.song.bpm = prevState.bpm || 120;
+        this.song.instrument = prevState.instrument || "default";
         
         document.getElementById('time-signature').value = this.song.timeSignature;
         document.getElementById('bpm-input').value = this.song.bpm;
+        document.getElementById('instrument-type').value = this.song.instrument;
+        this.setInstrument(this.song.instrument);
     }
 
     redo() {
@@ -350,7 +361,8 @@ class PlayerPiano {
         const currentState = JSON.stringify({
             notes: this.song.notes,
             timeSignature: this.song.timeSignature,
-            bpm: this.song.bpm
+            bpm: this.song.bpm,
+            instrument: this.song.instrument
         });
         this.undoStack.push(currentState);
 
@@ -358,9 +370,12 @@ class PlayerPiano {
         this.song.notes = nextState.notes;
         this.song.timeSignature = nextState.timeSignature;
         this.song.bpm = nextState.bpm || 120;
+        this.song.instrument = nextState.instrument || "default";
 
         document.getElementById('time-signature').value = this.song.timeSignature;
         document.getElementById('bpm-input').value = this.song.bpm;
+        document.getElementById('instrument-type').value = this.song.instrument;
+        this.setInstrument(this.song.instrument);
     }
 
     initEventListeners() {
@@ -705,6 +720,7 @@ class PlayerPiano {
         const name = document.getElementById('song-name').value || "Untitled";
         this.song.name = name;
         this.song.bpm = parseInt(document.getElementById('bpm-input').value) || 120;
+        this.song.instrument = document.getElementById('instrument-type').value;
         
         const songs = JSON.parse(localStorage.getItem('piano-songs') || '{}');
         songs[name] = this.song;
@@ -734,6 +750,8 @@ class PlayerPiano {
             document.getElementById('song-name').value = this.song.name;
             document.getElementById('time-signature').value = this.song.timeSignature;
             document.getElementById('bpm-input').value = this.song.bpm || 120;
+            document.getElementById('instrument-type').value = this.song.instrument || "default";
+            this.setInstrument(this.song.instrument || "default");
             this.lastSavedState = JSON.stringify(this.song);
             this.stop();
         }

@@ -37,12 +37,149 @@ class PlayerPiano {
 
         this.initKeys();
         this.initControls();
+        this.initFileActions();
         this.initEventListeners();
         this.resize();
         this.loadSongList();
+        this.checkURLParams();
 
         window.addEventListener('resize', () => this.resize());
         requestAnimationFrame((t) => this.loop(t));
+    }
+
+    checkURLParams() {
+        const hash = window.location.hash.substring(1);
+        if (hash) {
+            try {
+                const decompressed = LZString.decompressFromEncodedURIComponent(hash);
+                if (decompressed) {
+                    const song = JSON.parse(decompressed);
+                    this.song = song;
+                    document.getElementById('song-name').value = this.song.name;
+                    document.getElementById('time-signature').value = this.song.timeSignature;
+                    document.getElementById('bpm-input').value = this.song.bpm || 120;
+                    this.lastSavedState = JSON.stringify(this.song);
+                    window.location.hash = ''; // Clear hash after loading
+                }
+            } catch (e) {
+                console.error("Failed to load song from URL", e);
+            }
+        }
+    }
+
+    initFileActions() {
+        document.getElementById('export-json').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.downloadJSON(this.song, `${this.song.name}.json`);
+        });
+
+        document.getElementById('export-library').addEventListener('click', (e) => {
+            e.preventDefault();
+            const songs = localStorage.getItem('piano-songs') || '{}';
+            this.downloadJSON(JSON.parse(songs), 'piano_library_backup.json');
+        });
+
+        document.getElementById('import-file').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('hidden-import').click();
+        });
+
+        document.getElementById('hidden-import').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    if (data.notes && data.timeSignature) {
+                        // Single song import
+                        this.pushState();
+                        this.song = data;
+                        document.getElementById('song-name').value = this.song.name;
+                        document.getElementById('time-signature').value = this.song.timeSignature;
+                        document.getElementById('bpm-input').value = this.song.bpm || 120;
+                    } else {
+                        // Library import?
+                        if (confirm("This looks like a library backup. Merge into current library?")) {
+                            const existing = JSON.parse(localStorage.getItem('piano-songs') || '{}');
+                            const merged = { ...existing, ...data };
+                            localStorage.setItem('piano-songs', JSON.stringify(merged));
+                            this.loadSongList();
+                        }
+                    }
+                } catch (err) {
+                    alert("Error parsing file.");
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        document.getElementById('copy-json').addEventListener('click', (e) => {
+            e.preventDefault();
+            const text = JSON.stringify(this.song);
+            navigator.clipboard.writeText(text).then(() => alert("Song data copied to clipboard!"));
+        });
+
+        document.getElementById('paste-json').addEventListener('click', async (e) => {
+            e.preventDefault();
+            try {
+                const text = await navigator.clipboard.readText();
+                const data = JSON.parse(text);
+                if (data.notes) {
+                    this.pushState();
+                    this.song = data;
+                    document.getElementById('song-name').value = this.song.name;
+                    document.getElementById('time-signature').value = this.song.timeSignature;
+                    document.getElementById('bpm-input').value = this.song.bpm || 120;
+                }
+            } catch (err) {
+                alert("Invalid song data in clipboard.");
+            }
+        });
+
+        document.getElementById('share-url').addEventListener('click', (e) => {
+            e.preventDefault();
+            const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(this.song));
+            const url = window.location.origin + window.location.pathname + '#' + compressed;
+            navigator.clipboard.writeText(url).then(() => alert("Shareable URL copied to clipboard!"));
+        });
+
+        document.getElementById('export-midi').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.exportMIDI();
+        });
+    }
+
+    downloadJSON(obj, filename) {
+        const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    exportMIDI() {
+        if (!window.MidiWriter) return alert("MIDI library not loaded.");
+        const track = new MidiWriter.Track();
+        track.setTempo(this.song.bpm);
+        track.addEvent(new MidiWriter.ProgramChangeEvent({ instrument: 1 }));
+
+        this.song.notes.forEach(note => {
+            // Convert beat-based timing to MIDI ticks (128 ticks per beat)
+            track.addEvent(new MidiWriter.NoteEvent({
+                pitch: this.getMidiName(note.midi),
+                duration: 'T' + Math.round(note.duration * 128),
+                startTick: Math.round(note.start * 128)
+            }));
+        });
+
+        const write = new MidiWriter.Writer(track);
+        const a = document.createElement('a');
+        a.href = write.dataUri();
+        a.download = `${this.song.name}.mid`;
+        a.click();
     }
 
     getMidiName(midi) {

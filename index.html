@@ -6,6 +6,8 @@
     <title>Player Piano Editor</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://unpkg.com/midi-writer-js@2.1.4/browser/index.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
 </head>
 <body>
     <div id="app">
@@ -54,7 +56,20 @@
                 <select id="load-song">
                     <option value="">Load...</option>
                 </select>
+                <div class="dropdown">
+                    <button id="file-actions-btn">Menu ▾</button>
+                    <div id="file-actions-content" class="dropdown-content">
+                        <a href="#" id="export-json">Export Song (JSON)</a>
+                        <a href="#" id="export-library">Export Library (JSON)</a>
+                        <a href="#" id="import-file">Import File...</a>
+                        <a href="#" id="copy-json">Copy to Clipboard</a>
+                        <a href="#" id="paste-json">Paste from Clipboard</a>
+                        <a href="#" id="share-url">Get Shareable URL</a>
+                        <a href="#" id="export-midi">Export as .mid</a>
+                    </div>
+                </div>
             </div>
+            <input type="file" id="hidden-import" style="display: none;" accept=".json">
             <div class="instructions">
                 L: Add/Move | R/Delete: Del | Scroll: Wheel/Drag
             </div>
